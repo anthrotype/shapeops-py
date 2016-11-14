@@ -93,13 +93,12 @@ def pairIteration(c1, c2, curveIntersectionThreshold=0.5, results=None):
         results = []
     c1b = bboxof(c1)
     c2b = bboxof(c2)
-    r = 100000
     threshold = curveIntersectionThreshold
     if ((c1b[0]['size'] + c1b[1]['size']) < threshold and
             (c2b[0]['size'] + c2b[1]['size']) < threshold):
         results.append(
-            [int(r * (c1._t1 + c1._t2) / 2) / r,
-             int(r * (c2._t1 + c2._t2) / 2) / r])
+            [(c1._t1 + c1._t2) / 2,
+             (c2._t1 + c2._t2) / 2])
         return results
 
     cc1 = c1.split(0.5)
