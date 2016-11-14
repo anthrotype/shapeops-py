@@ -5,12 +5,6 @@ from shapeops.bezier import Bezier
 from shapeops.bezier.utils import dist
 
 
-try:
-    long
-except NameError:
-    long = int
-
-
 def rebuildShape(polys, recog, pthash, pvhash, resolution):
     ans = []
     for poly in polys:
@@ -42,8 +36,8 @@ def ordinalSegPts(poly, l, r, pthash, pvhash):
 def bezpt(p, resolution):
     x = p[0] / resolution
     y = p[1] / resolution
-    return (long(x) if x.is_integer() else x,
-            long(y) if y.is_integer() else y)
+    return (int(x) if x.is_integer() else x,
+            int(y) if y.is_integer() else y)
 
 
 def rebuildContour(_poly, recog, pthash, pvhash, resolution):
