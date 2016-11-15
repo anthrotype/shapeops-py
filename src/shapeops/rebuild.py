@@ -84,12 +84,12 @@ def rebuildContour(_poly, recog, pthash, pvhash, resolution):
             else:
                 m = j
                 while m < n:
-                    ans.append(Bezier(
-                        bezpt(poly[m], resolution),
-                        bezpt(poly[m], resolution),
-                        bezpt(poly[m + 1], resolution),
-                        bezpt(poly[m + 1], resolution)
-                    ))
+                    p1, p2 = poly[m], poly[m+1]
+                    if (abs(p1[0] - p2[0]) >= resolution or
+                            abs(p1[1] - p2[1]) >= resolution):
+                        b1 = bezpt(p1, resolution)
+                        b2 = bezpt(p2, resolution)
+                        ans.append(Bezier(b1, b1, b2, b2))
                     m += 1
         j = n
     return ans
