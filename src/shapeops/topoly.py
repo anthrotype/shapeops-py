@@ -5,16 +5,6 @@ from fontTools.misc.py23 import round
 import math
 
 
-try:
-    long
-except NameError:
-    long = int
-
-
-def keyofz(z):
-    return 'X' + repr(long(z[0])) + 'Y' + repr(long(z[1]))
-
-
 def scalePoint(p, resolution):
     return round(p[0] * resolution), round(p[1] * resolution)
 
@@ -28,7 +18,6 @@ def toPoly(shape, sindex, pthash, pvhash, resolution):
             segpts = [scalePoint(z, resolution) for z in contour[k].getLUT(
                       max(5, int(math.ceil(contour[k].length() / 5))))]
             for m in range(len(segpts)):
-                # zk = keyofz(segpts[m])
                 zk = segpts[m]
                 isMid = m > 0 and m < len(segpts) - 1
                 if isMid:
