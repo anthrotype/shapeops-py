@@ -1,123 +1,108 @@
 from __future__ import print_function, division, absolute_import
 from __future__ import unicode_literals
 
-from ufoLib.pointPen import BasePointToSegmentPen, GuessSmoothPointPen
+from ufoLib.pointPen import GuessSmoothPointPen
 
-from shapeops.bezier import Bezier
-from shapeops.shape import lerp
 import shapeops
 
 
-class BezierDataPointPen(BasePointToSegmentPen):
+class ContourDataPointPen(object):
 
-    def __init__(self):
-        super(BezierDataPointPen, self).__init__()
-        self.contours = []
+    def __init__(self, data=None):
+        self.data = data if data is not None else []
+        self._points = self._closed = None
 
-    def _flushContour(self, segments):
-        if not segments:
-            return
-        closed = segments[0][0] != "move"
-        if closed:
-            # the BasePointToSegmentPen.endPath method that calls _flushContour
-            # rotates the point list of closed contours so that they end with
-            # the first on-curve point. We restore the original starting point.
-            segments = segments[-1:] + segments[:-1]
-        contour = []
-        prev_points = segments[-1][1]
-        prev_on_curve = prev_points[-1][0]
-        for segment_type, points in segments:
-            if segment_type == "move":
-                pass
-            elif segment_type == "curve":
-                segment = Bezier(prev_on_curve, *(p[0] for p in points))
-                segment._t1 = len(contour)
-                segment._t2 = len(contour) + 1
-                contour.append(segment)
-            elif segment_type == "line":
-                on_curve = points[-1][0]
-                segment = Bezier(
-                    prev_on_curve,
-                    (lerp(prev_on_curve[0], on_curve[0], 1/3),
-                     lerp(prev_on_curve[1], on_curve[1], 1/3)),
-                    (lerp(prev_on_curve[0], on_curve[0], 2/3),
-                     lerp(prev_on_curve[1], on_curve[1], 2/3)),
-                    on_curve)
-                segment._t1 = len(contour)
-                segment._t2 = len(contour) + 1
-                contour.append(segment)
-            else:
-                raise AssertionError(segment_type)
-            prev_on_curve = points[-1][0]
-        self.contours.append(contour)
+    def beginPath(self):
+        assert self._points is None and self._closed is None
+        self._points = []
+        self._closed = True
+
+    def endPath(self):
+        points = self._points
+        if len(points):
+            if self._closed:
+                points.append(dict(points[0]))
+            self.data.append(points)
+        self._points = self._closed = None
+
+    def addPoint(self, pt, segmentType=None, smooth=False, name=None, **kwargs):
+        if segmentType == "move":
+            self._closed = False
+        self._points.append({'x': pt[0],
+                             'y': pt[1],
+                             'on': False if segmentType is None else True})
 
     def addComponent(self, baseGlyphName, transformation):
         raise NotImplementedError
 
 
-class BezierContour(object):
-
-    def __init__(self, beziers):
-        segments = []
-        for bezier in beziers:
-            if bezier._linear:
-                segment_type = "line"
-                points = bezier.points[-1:]
-            else:
-                segment_type = "curve"
-                points = bezier.points[1:]
-            segments.append((segment_type, points))
-        self.segments = segments
-
-    def drawPoints(self, pen):
-        pen.beginPath()
-        last_offcurves = []
-        for i, (segment_type, points) in enumerate(self.segments):
-            if segment_type in ("move", "line"):
-                assert len(points) == 1, (
-                    "illegal line segment point count: %d" % len(points))
-                pt = points[0]
-                pen.addPoint(pt, segment_type)
-            elif segment_type == "curve":
-                assert len(points) >= 3, (
-                    "illegal curve segment point count: %d" % len(points))
-                offcurves = points[:-1]
-                if offcurves:
-                    if i == 0:
-                        # any off-curve points preceding the first on-curve
-                        # will be appended at the end of the contour
-                        last_offcurves = offcurves
-                    else:
-                        for pt in offcurves:
-                            pen.addPoint(pt, None)
-                pt = points[-1]
-                pen.addPoint(pt, segment_type)
-            else:
-                raise AssertionError(
-                    "unexpected segment type: %r" % segment_type)
-        for pt in last_offcurves:
-            pen.addPoint(pt, None)
-        pen.endPath()
-
-
-def contoursToBeziers(shape):
-    pen = BezierDataPointPen()
-    for contour in shape:
+def contoursToZs(contours):
+    pen = ContourDataPointPen()
+    for contour in contours:
         contour.drawPoints(pen)
-    return pen.contours
+    return pen.data
 
 
-def beziersToContours(shape):
-    return [BezierContour(beziers) for beziers in shape]
+def zsToContourPoints(points):
+    assert points[0]['on'], 'contour must start with an on-curve point'
+    closed = points[-1] == points[0]
+    if closed:
+        points = points[:-1]
+    contour = []
+    lastOn = points[-1]['on']
+    for i, point in enumerate(points):
+        x, y, on = point['x'], point['y'], point['on']
+        if not closed and i == 0:
+            segmentType = 'move'
+        else:
+            segmentType = ('curve' if (on and not lastOn) else
+                           'line' if (on and lastOn) else None)
+        contour.append(((x, y), segmentType))
+        lastOn = on
+    return contour
 
 
-def removeOverlaps(contours, outPen, guessSmooth=True, **kwargs):
-    shape = contoursToBeziers(contours)
-    result = shapeops.removeOverlaps(shape, **kwargs)
+def drawZsWithPointPen(shape, pointPen, guessSmooth=True):
     if guessSmooth:
-        outPen = GuessSmoothPointPen(outPen)
-    for contour in beziersToContours(result):
-        contour.drawPoints(outPen)
+        pointPen = GuessSmoothPointPen(pointPen)
+    contours = [zsToContourPoints(pts) for pts in shape]
+    for points in contours:
+        if not points:
+            continue
+        pointPen.beginPath()
+        for pt, segmentType in points:
+            pointPen.addPoint(pt, segmentType)
+        pointPen.endPath()
+
+
+def union(contours, outPen, guessSmooth=True, **kwargs):
+    paths = contoursToZs(contours)
+    result = shapeops.union(paths, **kwargs)
+    drawZsWithPointPen(result, outPen, guessSmooth=guessSmooth)
+
+
+def difference(subjectContours, clippingContours, outPen, guessSmooth=True,
+               **kwargs):
+    subjectPaths = contoursToZs(subjectContours)
+    clippingPaths = contoursToZs(clippingContours)
+    result = shapeops.difference(subjectPaths, clippingPaths, **kwargs)
+    drawZsWithPointPen(result, outPen, guessSmooth=guessSmooth)
+
+
+def intersection(subjectContours, clippingContours, outPen, guessSmooth=True,
+                 **kwargs):
+    subjectPaths = contoursToZs(subjectContours)
+    clippingPaths = contoursToZs(clippingContours)
+    result = shapeops.intersection(subjectPaths, clippingPaths, **kwargs)
+    drawZsWithPointPen(result, outPen, guessSmooth=guessSmooth)
+
+
+def xor(subjectContours, clippingContours, outPen, guessSmooth=True,
+        **kwargs):
+    subjectPaths = contoursToZs(subjectContours)
+    clippingPaths = contoursToZs(clippingContours)
+    result = shapeops.xor(subjectPaths, clippingPaths, **kwargs)
+    drawZsWithPointPen(result, outPen, guessSmooth=guessSmooth)
 
 
 if __name__ == "__main__":
@@ -132,7 +117,7 @@ if __name__ == "__main__":
 
     contours = list(glyph)
     glyph.clearContours()
-    removeOverlaps(contours, glyph.getPointPen())
+    union(contours, glyph.getPointPen())
 
     output = writeGlyphToString(glyph.name, glyph, glyph.drawPoints)
-    print(output)
+    sys.stdout.write(output)
