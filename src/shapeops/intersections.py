@@ -168,14 +168,6 @@ def findAllSelfIntersections(shape, origshape, ERROR):
     return ans
 
 
-def FIRST(x):
-    return x[0]
-
-
-def SECOND(x):
-    return x[1]
-
-
 def findCrossIntersections(shape1, shape2, i1, i2, notsame, ERROR):
     for c in range(len(shape1)):
         for d in range(len(shape2)):
@@ -183,8 +175,8 @@ def findCrossIntersections(shape1, shape2, i1, i2, notsame, ERROR):
                 l = shape1[c]
                 r = shape2[d]
                 intersections = curveIntersects(l, r, ERROR)
-                i1[c].extend(map(FIRST, intersections))
-                i2[d].extend(map(SECOND, intersections))
+                i1[c].extend(x[0] for x in intersections)
+                i2[d].extend(x[1] for x in intersections)
 
 
 def splitShape(shape, irecs, ERROR):
