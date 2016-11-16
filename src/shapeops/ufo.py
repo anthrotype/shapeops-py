@@ -1,9 +1,8 @@
 from __future__ import print_function, division, absolute_import
 from __future__ import unicode_literals
 
-from ufoLib.pointPen import GuessSmoothPointPen
-
 import shapeops
+from shapeops.bezier.utils import pointOnLine
 
 
 class ContourDataPointPen(object):
@@ -43,12 +42,14 @@ def contoursToZs(contours):
     return pen.data
 
 
-def zsToContourPoints(points):
+def zsToContourPoints(points, guessSmooth=True):
+    contour = []
+    if not points:
+        return contour
     assert points[0]['on'], 'contour must start with an on-curve point'
     closed = points[-1] == points[0]
     if closed:
         points = points[:-1]
-    contour = []
     lastOn = points[-1]['on']
     for i, point in enumerate(points):
         x, y, on = point['x'], point['y'], point['on']
@@ -57,21 +58,41 @@ def zsToContourPoints(points):
         else:
             segmentType = ('curve' if (on and not lastOn) else
                            'line' if (on and lastOn) else None)
-        contour.append(((x, y), segmentType))
+        smooth = False
+        contour.append([(x, y), segmentType, smooth])
         lastOn = on
+    # determine whether line/curve or curve/curve connections are "smooth"
+    if guessSmooth:
+        nPoints = len(contour)
+        if closed:
+            indices = range(-1, nPoints - 1) if nPoints > 1 else []
+        else:
+            indices = range(1, nPoints - 1)
+        for idx in indices:
+            pt, segmentType, _ = contour[idx]
+            if segmentType is None:
+                continue
+            prevIdx, nextIdx = idx - 1, idx + 1
+            if (contour[prevIdx][1] is not None and
+                    contour[nextIdx][1] is not None):
+                continue
+            pt = contour[idx][0]
+            prevPt = contour[prevIdx][0]
+            nextPt = contour[nextIdx][0]
+            if (pt != prevPt and pt != nextPt and prevPt != nextPt and
+                    pointOnLine(prevPt, nextPt, pt)):
+                contour[idx][2] = True  # set 'smooth' to True
     return contour
 
 
 def drawZsWithPointPen(shape, pointPen, guessSmooth=True):
-    if guessSmooth:
-        pointPen = GuessSmoothPointPen(pointPen)
-    contours = [zsToContourPoints(pts) for pts in shape]
+    contours = [zsToContourPoints(pts, guessSmooth) for pts in shape]
     for points in contours:
         if not points:
             continue
         pointPen.beginPath()
-        for pt, segmentType in points:
-            pointPen.addPoint(pt, segmentType)
+        for pt, segmentType, smooth in points:
+            pointPen.addPoint(pt, segmentType, smooth)
         pointPen.endPath()
 
 
