@@ -6,6 +6,8 @@ from shapeops.intersections import (
     findAllSelfIntersections, findCrossIntersections, splitShape)
 from shapeops.topoly import toPoly
 from shapeops.rebuild import rebuildShape
+from shapeops.error import (
+    InvalidSubjectContourError, InvalidClippingContourError, ExecutionError)
 
 import pyclipper
 
@@ -13,52 +15,83 @@ import pyclipper
 RESOLUTION = 1 << 17
 
 
-def executeClipper(subjectPaths, clippingPaths, operation, fillRule):
+def _executeClipper(subjectPaths, clippingPaths, operation,
+                    fillRule=pyclipper.PFT_NONZERO):
     pc = pyclipper.Pyclipper()
-    for p in subjectPaths:
-        pc.AddPath(p, pyclipper.PT_SUBJECT)
-    for p in clippingPaths:
-        pc.AddPath(p, pyclipper.PT_CLIP)
-    return pc.Execute(operation, fillRule, fillRule)
+    for i, p in enumerate(subjectPaths):
+        try:
+            pc.AddPath(p, pyclipper.PT_SUBJECT)
+        except pyclipper.ClipperException:
+            raise InvalidSubjectContourError(
+                "contour %d is invalid for clipping" % i)
+    for j, p in enumerate(clippingPaths):
+        try:
+            pc.AddPath(p, pyclipper.PT_CLIP)
+        except pyclipper.ClipperException:
+            raise InvalidClippingContourError(
+                "contour %d is invalid for clipping" % j)
+    try:
+        solution = pc.Execute(operation, fillRule, fillRule)
+    except pyclipper.ClipperException as exc:
+        raise ExecutionError(exc)
+    return solution
 
 
-def removeOverlaps(shape, fillRule=pyclipper.PFT_NONZERO, resolution=RESOLUTION):
+def _performOperation(operation, subjectPaths, clippingPaths=[],
+                      resolution=RESOLUTION):
     error = 0.5 / resolution
-    s1 = reduceShape(shape)
-    i1 = findAllSelfIntersections(s1, shape, error)
 
+    ss1 = zsToBeziers(subjectPaths)
+    s1 = reduceShape(ss1)
+    i1 = findAllSelfIntersections(s1, ss1, error)
     findCrossIntersections(s1, s1, i1, i1, True, error)
 
-    for c in range(len(i1)):
-        i1[c].sort()
+    if clippingPaths:
+        ss2 = zsToBeziers(clippingPaths)
+        s2 = reduceShape(ss2)
+        i2 = findAllSelfIntersections(s2, ss2, error)
+        findCrossIntersections(s2, s2, i2, i2, True, error)
+        findCrossIntersections(s1, s2, i1, i2, False, error)
 
-    xs1 = splitShape(shape, i1, error)
+    for intersections in i1:
+        intersections.sort()
+    xs1 = splitShape(ss1, i1, error)
+
+    if clippingPaths:
+        for intersections in i2:
+            intersections.sort()
+        xs2 = splitShape(ss2, i2, error)
+    else:
+        xs2 = []
 
     pthash = {}
     pvhash = {}
 
     p1 = toPoly(xs1, 1, pthash, pvhash, resolution)
+    p2 = toPoly(xs2, 2, pthash, pvhash, resolution) if clippingPaths else []
 
-    operation = pyclipper.CT_UNION
-    solution_paths = executeClipper(p1, [], operation, fillRule)
+    solution_paths = _executeClipper(p1, p2, operation)
 
-    result = rebuildShape(solution_paths, [None, xs1], pthash, pvhash, resolution)
-    return result
+    result = rebuildShape(solution_paths, [None, xs1, xs2],
+                          pthash, pvhash, resolution)
 
-
-def removeOverlapsZs(zs, fillRule=pyclipper.PFT_NONZERO,
-                     resolution=RESOLUTION, **kwargs):
-    shape = zsToBeziers(zs)
-    result = removeOverlaps(shape, fillRule=fillRule, resolution=resolution)
     return beziersToZs(result)
 
 
-if __name__ == '__main__':
-    import json
-    import sys
+def union(paths, **kwargs):
+    return _performOperation(pyclipper.CT_UNION, paths, [], **kwargs)
 
-    data = json.load(sys.stdin)
 
-    result = removeOverlapsZs(data)
+def difference(subjectPaths, clippingPaths, **kwargs):
+    return _performOperation(
+        pyclipper.CT_DIFFERENCE, subjectPaths, clippingPaths, **kwargs)
 
-    print(json.dumps(result, indent=2, sort_keys=True))
+
+def intersection(subjectPaths, clippingPaths, **kwargs):
+    return _performOperation(
+        pyclipper.CT_INTERSECTION, subjectPaths, clippingPaths, **kwargs)
+
+
+def xor(subjectPaths, clippingPaths, **kwargs):
+    return _performOperation(
+        pyclipper.CT_XOR, subjectPaths, clippingPaths, **kwargs)
