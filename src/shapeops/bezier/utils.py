@@ -158,3 +158,7 @@ def closest(LUT, point):
             mdist = d
             mpos = idx
     return mdist, mpos
+
+
+def pointOnLine(pt1, pt2, a, epsilon=1e-2):
+    return abs(dist(pt1, a) + dist(a, pt2) - dist(pt1, pt2)) <= epsilon
