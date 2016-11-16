@@ -95,3 +95,7 @@ def intersection(subjectPaths, clippingPaths, **kwargs):
 def xor(subjectPaths, clippingPaths, **kwargs):
     return _performOperation(
         pyclipper.CT_XOR, subjectPaths, clippingPaths, **kwargs)
+
+
+# for compatibility with caryll-shapeops interface
+removeOverlap = union
