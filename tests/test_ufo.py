@@ -52,18 +52,34 @@ BASIC_Z_SHAPE = [
 
 @pytest.fixture
 def basic_glyph():
-    g = Glyph()
-    pen = g.getPointPen()
+    glyph = Glyph()
+    pen = glyph.getPointPen()
     for contour in BASIC_CONTOURS:
         pen.beginPath()
         for pt, segmentType, smooth in contour:
             pen.addPoint(pt, segmentType, smooth)
         pen.endPath()
-    return g
+    return glyph
 
 
 def test_contoursToZs(basic_glyph):
     assert contoursToZs(basic_glyph) == BASIC_Z_SHAPE
+
+
+def test_contoursToZs_open_contour():
+    glyph = Glyph()
+    pen = glyph.getPointPen()
+    pen.beginPath()
+    pen.addPoint((0, 0), 'move')
+    pen.addPoint((1, 1), 'line')
+    pen.addPoint((2, 2), 'line')
+    pen.endPath()
+
+    shape = contoursToZs(glyph)
+
+    assert shape == [[{'x': 0, 'y': 0, 'on': True},
+                      {'x': 1, 'y': 1, 'on': True},
+                      {'x': 2, 'y': 2, 'on': True}]]
 
 
 def test_zsToContourPoints_smooth():
@@ -84,23 +100,39 @@ def test_zsToContourPoints_no_smooth():
     assert contours == expected
 
 
-def test_drawZsWithPointPen():
+def test_zsToContourPoints_smooth_duplicate_points():
+    pts = [{'x': 0, 'y': 0, 'on': True},
+           {'x': 5, 'y': 5, 'on': False},
+           {'x': 10, 'y': 10, 'on': False},
+           {'x': 15, 'y': 10, 'on': True},
+           {'x': 15, 'y': 10, 'on': True},  # duplicate point
+           {'x': 20, 'y': 10, 'on': False},
+           {'x': 25, 'y': 5, 'on': False},
+           {'x': 30, 'y': 0, 'on': True},
+           {'x': 0, 'y': 0, 'on': True}]
+    contour = zsToContourPoints(pts, guessSmooth=True)
+
+    assert all(pt[2] is False for pt in contour)  # no smooth
+
+
+def test_zsToContourPoints_open_shape():
+    pts = [{'x': 0, 'y': 0, 'on': True},
+           {'x': 1, 'y': 1, 'on': True},
+           {'x': 2, 'y': 2, 'on': True}]
+
+    assert zsToContourPoints(pts) == [[(0, 0), 'move', False],
+                                      [(1, 1), 'line', False],
+                                      [(2, 2), 'line', False]]
+
+
+@pytest.mark.parametrize("guessSmooth", [True, False])
+def test_drawZsWithPointPen(guessSmooth):
     glyph = Glyph()
     pen = glyph.getPointPen()
-
     assert len(glyph) == 0
 
-    drawZsWithPointPen(BASIC_Z_SHAPE, pen, guessSmooth=True)
+    drawZsWithPointPen(BASIC_Z_SHAPE, pen, guessSmooth=guessSmooth)
 
     assert len(glyph) == 2
     assert glyph[0][0].smooth is False
-    assert glyph[1][0].smooth is True
-
-    glyph.clearContours()
-
-    assert len(glyph) == 0
-
-    drawZsWithPointPen(BASIC_Z_SHAPE, pen, guessSmooth=False)
-
-    assert len(glyph) == 2
-    assert glyph[1][0].smooth is False
+    assert glyph[1][0].smooth is guessSmooth
