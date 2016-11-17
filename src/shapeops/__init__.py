@@ -15,8 +15,20 @@ import pyclipper
 RESOLUTION = 1 << 17
 
 
-def _executeClipper(subjectPaths, clippingPaths, operation,
-                    fillRule=pyclipper.PFT_NONZERO):
+class ops(object):
+    intersection = pyclipper.CT_INTERSECTION
+    union = pyclipper.CT_UNION
+    difference = pyclipper.CT_DIFFERENCE
+    xor = pyclipper.CT_XOR
+
+
+class fillRules(object):
+    evenodd = pyclipper.PFT_EVENODD
+    nonzero = pyclipper.PFT_NONZERO
+
+
+def _executeClipper(subjectPaths, clippingPaths, operation, subjectFillRule,
+                    clippingFillRule):
     pc = pyclipper.Pyclipper()
     for i, p in enumerate(subjectPaths):
         try:
@@ -31,14 +43,16 @@ def _executeClipper(subjectPaths, clippingPaths, operation,
             raise InvalidClippingContourError(
                 "contour %d is invalid for clipping" % j)
     try:
-        solution = pc.Execute(operation, fillRule, fillRule)
+        solution = pc.Execute(operation, subjectFillRule, clippingFillRule)
     except pyclipper.ClipperException as exc:
         raise ExecutionError(exc)
     return solution
 
 
-def _performOperation(operation, subjectPaths, clippingPaths=[],
-                      resolution=RESOLUTION):
+def boole(operation, subjectPaths, clippingPaths=[],
+          subjectFillRule=fillRules.nonzero,
+          clippingFillRule=fillRules.nonzero,
+          resolution=RESOLUTION):
     error = 0.5 / resolution
 
     ss1 = zsToBeziers(subjectPaths)
@@ -70,7 +84,8 @@ def _performOperation(operation, subjectPaths, clippingPaths=[],
     p1 = toPoly(xs1, 1, pthash, pvhash, resolution)
     p2 = toPoly(xs2, 2, pthash, pvhash, resolution) if clippingPaths else []
 
-    solution_paths = _executeClipper(p1, p2, operation)
+    solution_paths = _executeClipper(p1, p2, operation, subjectFillRule,
+                                     clippingFillRule)
 
     result = rebuildShape(solution_paths, [None, xs1, xs2],
                           pthash, pvhash, resolution)
@@ -78,23 +93,20 @@ def _performOperation(operation, subjectPaths, clippingPaths=[],
     return beziersToZs(result)
 
 
-def union(paths, **kwargs):
-    return _performOperation(pyclipper.CT_UNION, paths, [], **kwargs)
+def union(subjectPaths, clippingPaths=[], **kwargs):
+    return boole(ops.union, subjectPaths, clippingPaths, **kwargs)
 
 
 def difference(subjectPaths, clippingPaths, **kwargs):
-    return _performOperation(
-        pyclipper.CT_DIFFERENCE, subjectPaths, clippingPaths, **kwargs)
+    return boole(ops.difference, subjectPaths, clippingPaths, **kwargs)
 
 
 def intersection(subjectPaths, clippingPaths, **kwargs):
-    return _performOperation(
-        pyclipper.CT_INTERSECTION, subjectPaths, clippingPaths, **kwargs)
+    return boole(ops.intersection, subjectPaths, clippingPaths, **kwargs)
 
 
 def xor(subjectPaths, clippingPaths, **kwargs):
-    return _performOperation(
-        pyclipper.CT_XOR, subjectPaths, clippingPaths, **kwargs)
+    return boole(ops.xor, subjectPaths, clippingPaths, **kwargs)
 
 
 # for compatibility with caryll-shapeops interface
