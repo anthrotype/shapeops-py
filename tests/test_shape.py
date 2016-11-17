@@ -9,7 +9,7 @@ from shapeops.bezier import Bezier
 import pytest
 
 
-BASIC_SHAPE_ZS = [
+BASIC_Z_SHAPE = [
     [{'on': True, 'x': 72, 'y': 56},
      {'on': True, 'x': 218, 'y': 56},
      {'on': True, 'x': 218, 'y': 202},
@@ -31,7 +31,7 @@ BASIC_SHAPE_ZS = [
 ]
 
 
-BASIC_SHAPE_BEZIERS = [
+BASIC_BEZIER_SHAPE = [
    [Bezier((72, 56),
            (120.66666666666666, 56.0),
            (169.33333333333331, 56.0),
@@ -56,8 +56,8 @@ BASIC_SHAPE_BEZIERS = [
 
 
 def test_contourZsToBeziers():
-    rect = contourZsToBeziers(BASIC_SHAPE_ZS[0])
-    circle = contourZsToBeziers(BASIC_SHAPE_ZS[1])
+    rect = contourZsToBeziers(BASIC_Z_SHAPE[0])
+    circle = contourZsToBeziers(BASIC_Z_SHAPE[1])
 
     assert len(rect) == 4
     assert len(circle) == 4
@@ -87,12 +87,12 @@ def test_contourZsToBeziers():
 
 
 def test_zsToBeziers():
-    shape = zsToBeziers(BASIC_SHAPE_ZS)
+    shape = zsToBeziers(BASIC_Z_SHAPE)
     assert len(shape) == 2
 
 
 def test_reduceContour():
-    rect, circle = zsToBeziers(BASIC_SHAPE_ZS)
+    rect, circle = zsToBeziers(BASIC_Z_SHAPE)
 
     rerect = reduceContour(rect)
 
@@ -105,22 +105,20 @@ def test_reduceContour():
     assert len(recircle) == 8
     assert not any(seg._linear for seg in recircle)
 
-    redux = [Bezier((274, 281), (263, 287), (251, 291), (237, 291)),
-             Bezier((237, 291), (237, 281)),
-             Bezier((237, 281), (274, 281))]
+    contour = [Bezier((274, 281), (263, 287), (251, 291), (237, 291)),
+               Bezier((237, 291), (237, 281)),
+               Bezier((237, 281), (274, 281))]
 
-    reredux = reduceContour(redux)
-
-    assert redux == reredux
+    assert contour == reduceContour(contour)
 
 
 def test_reduceShape():
-    reshape = reduceShape(zsToBeziers(BASIC_SHAPE_ZS))
-    assert len(reshape) == 2
+    rs = reduceShape(zsToBeziers(BASIC_Z_SHAPE))
+    assert len(rs) == 2
 
 
 def test_contourBeziersToZs():
-    rect, circle = BASIC_SHAPE_BEZIERS
+    rect, circle = BASIC_BEZIER_SHAPE
 
     zrect = contourBeziersToZs(rect)
     zcircle = contourBeziersToZs(circle)
@@ -137,6 +135,6 @@ def test_contourBeziersToZs():
 
 
 def test_beziersToZs():
-    shape = beziersToZs(BASIC_SHAPE_BEZIERS)
+    shape = beziersToZs(BASIC_BEZIER_SHAPE)
     assert len(shape) == 2
     assert all(isinstance(p, dict) for contour in shape for p in contour)
