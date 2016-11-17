@@ -1,0 +1,24 @@
+sudo: false
+language: python
+matrix:
+  include:
+    - python: 2.7
+    - python: 3.5
+install:
+  - pip install --upgrade setuptools wheel
+  - pip install tox-travis
+script:
+  - tox
+deploy:
+  # deploy to PyPI on tags
+  provider: pypi
+  server: https://upload.pypi.org/legacy/
+  on:
+    repo: anthrotype/shapeops-py
+    tags: true
+    all_branches: true
+    python: 3.5
+  user: anthrotype
+  password:
+    secure: OiLFb72RR3qeNypk/5TjtkAFiO7wXfxua/A1BDmUShkTS9CXpcU8PnVCUNb5SeKKlipGFINIooFgqRr9BR6uYwMJAtH2po5CoryOMeKRuVGQD30U3mHlN+SyxKtJTjX0gpB59QjwvD3wfXSjD9v86tmmvuaP4dFwFa1wW8w9xMbpN5N6B5lpAZU+bqXDAyvGJFpUulbqjvmA5itDsO2MzhV3dwpMxBUAMVgsoRdRe5Te/y1cfn5Y9DVnPDMplLvdOQb77n3crcSv7pfOvJ3duaAMC3r3gcXqRiB3p2wC7smetbV1amVpO4zvfeohqJOWRcA26BzzF5HbTlMWE2spw6ci9MBTXfnHRMBVIT2oYSqFR3ncSMapfC10ZJNItMugFREKNTgAzkUzox5PE6uUufMZa3mvm4UCqt40FJjdzLbFI9Zp3RyJAZclgS0PF1iMhvMxFqsEZGZ7JmoV6wO51nQvRyFmmrOhJjfK/MMdK6qVUzLRG1pS+E2wlOtyPzI6+R1cnUjHthsC9dGDVDC8HsSEZEYOP4jDYtZyOiFgxfhgq4FeR3X9mcuGh7y/XIys8EBL1I+qRr1XvpEdPlSJUy4kzvq9ieGSMFyD5TdtAPatTfFKIvnCMJ9/41lKpoaTuKuLzTl/JPXk/5GMQsrqzF+QkBHoM3f5LZaNv3tyiL0=
+  distributions: sdist bdist_wheel
