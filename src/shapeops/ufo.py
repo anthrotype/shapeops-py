@@ -69,7 +69,7 @@ def zsToContourPoints(points, guessSmooth=True):
         else:
             indices = range(1, nPoints - 1)
         for idx in indices:
-            pt, segmentType, _ = contour[idx]
+            segmentType = contour[idx][1]
             if segmentType is None:
                 continue
             prevIdx, nextIdx = idx - 1, idx + 1
