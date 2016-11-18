@@ -126,9 +126,6 @@ def pairIteration(c1, c2, curveIntersectionThreshold=0.5, results=None):
     return results
 
 
-_Pair = namedtuple('_Pair', ['left', 'right'])
-
-
 def curveOverlap(c1, c2):
     return (all(isclose(a, b)
                 for p1, p2 in zip(c1.points, c2.points)
@@ -138,26 +135,60 @@ def curveOverlap(c1, c2):
                 for a, b in zip(p1, p2)))
 
 
+def lineIntersects(l1, l2):
+    (p1, p2), (p3, p4) = l1, l2
+    (x1, y1), (x2, y2), (x3, y3), (x4, y4) = p1, p2, p3, p4
+    nx = (x1*y2 - y1*x2)*(x3 - x4) - (x1 - x2)*(x3*y4 - y3*x4)
+    ny = (x1*y2 - y1*x2)*(y3 - y4) - (y1 - y2)*(x3*y4 - y3*x4)
+    d = (x1 - x2)*(y3 - y4) - (y1 - y2)*(x3 - x4)
+
+    if d == 0:
+        return []
+
+    ip = (nx/d, ny/d)
+
+    t1 = dist(ip, p1) / dist(p2, p1)
+    t2 = dist(ip, p3) / dist(p4, p3)
+
+    if 0 < t1 and t1 < 1 and 0 < t2 and t2 < 1:
+        return [t1, t2]
+    else:
+        return []
+
+
+_Pair = namedtuple('_Pair', ['left', 'right'])
+
+
 def curveIntersects(c1, c2, curveIntersectionThreshold):
+    intersections = []
     pairs = []
-    # step 1: pair off any overlapping segments
+    # step 1: pair off any overlapping curve segments
     b1 = []
     b2 = []
     for j in range(len(c1)):
         b1.append(bboxof(c1[j]))
-    for j in range(len(c2)):
-        b2.append(bboxof(c2[j]))
+    for k in range(len(c2)):
+        b2.append(bboxof(c2[k]))
     for j in range(len(c1)):
         for k in range(len(c2)):
             if bboxOverlap(b1[j], b2[k]) and not curveOverlap(c1[j], c2[k]):
-                pairs.append(_Pair(c1[j], c2[k]))
+                if c1[j]._linear and c2[k]._linear:
+                    # special-case line-line intersection as the divide-and-
+                    # conquer algorithm fails to find intersections which fall
+                    # exactly in the middle...
+                    result = lineIntersects(
+                        (c1[j].points[0], c1[j].points[-1]),
+                        (c2[k].points[0], c2[k].points[-1]))
+                    if result:
+                        intersections.append(result)
+                else:
+                    pairs.append(_Pair(c1[j], c2[k]))
 
     # step 2: for each pairing, run through the convergence algorithm
-    intersections = []
     for pair in pairs:
         result = pairIteration(
             pair.left, pair.right, curveIntersectionThreshold, [])
-        if len(result) > 0:
+        if result:
             intersections.extend(result)
 
     return intersections
