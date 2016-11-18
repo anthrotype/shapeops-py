@@ -180,7 +180,8 @@ def curveIntersects(c1, c2, curveIntersectionThreshold):
                         (c1[j].points[0], c1[j].points[-1]),
                         (c2[k].points[0], c2[k].points[-1]))
                     if result:
-                        intersections.append(result)
+                        i1, i2 = result
+                        intersections.append([c1[j]._t1 + i1, c2[k]._t1 + i2])
                 else:
                     pairs.append(_Pair(c1[j], c2[k]))
 
