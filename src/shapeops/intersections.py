@@ -2,7 +2,13 @@ from __future__ import print_function, division, absolute_import
 from __future__ import unicode_literals
 from collections import namedtuple
 
+try:
+    from itertools import izip as zip
+except ImportError:
+    pass
+
 from shapeops.bezier.utils import dist
+from shapeops.py23 import isclose
 import math
 
 
@@ -123,6 +129,15 @@ def pairIteration(c1, c2, curveIntersectionThreshold=0.5, results=None):
 _Pair = namedtuple('_Pair', ['left', 'right'])
 
 
+def curveOverlap(c1, c2):
+    return (all(isclose(a, b)
+                for p1, p2 in zip(c1.points, c2.points)
+                for a, b in zip(p1, p2)) or
+            all(isclose(a, b)
+                for p1, p2 in zip(c1.points, reversed(c2.points))
+                for a, b in zip(p1, p2)))
+
+
 def curveIntersects(c1, c2, curveIntersectionThreshold):
     pairs = []
     # step 1: pair off any overlapping segments
@@ -134,7 +149,7 @@ def curveIntersects(c1, c2, curveIntersectionThreshold):
         b2.append(bboxof(c2[j]))
     for j in range(len(c1)):
         for k in range(len(c2)):
-            if bboxOverlap(b1[j], b2[k]):
+            if bboxOverlap(b1[j], b2[k]) and not curveOverlap(c1[j], c2[k]):
                 pairs.append(_Pair(c1[j], c2[k]))
 
     # step 2: for each pairing, run through the convergence algorithm
