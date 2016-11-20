@@ -136,7 +136,8 @@ def curveOverlap(c1, c2):
 
 
 def lineIntersects(l1, l2):
-    (p1, p2), (p3, p4) = l1, l2
+    (p1, p2) = l1.points[0], l1.points[-1]
+    (p3, p4) = l2.points[0], l2.points[-1]
     (x1, y1), (x2, y2), (x3, y3), (x4, y4) = p1, p2, p3, p4
     nx = (x1*y2 - y1*x2)*(x3 - x4) - (x1 - x2)*(x3*y4 - y3*x4)
     ny = (x1*y2 - y1*x2)*(y3 - y4) - (y1 - y2)*(x3*y4 - y3*x4)
@@ -147,11 +148,18 @@ def lineIntersects(l1, l2):
 
     ip = (nx/d, ny/d)
 
-    t1 = dist(ip, p1) / dist(p2, p1)
-    t2 = dist(ip, p3) / dist(p4, p3)
+    parameters = []
+    for (start, end, t_start) in ((p1, p2, l1._t1), (p3, p4, l2._t1)):
+        lineLen = dist(start, end)
+        lenFromStart = dist(ip, start)
+        t = lenFromStart / lineLen
+        # check the intersection is not before the start, nor after the end
+        lenFromEnd = dist(ip, end)
+        if not isclose(lineLen + lenFromStart, lenFromEnd) and 0 < t < 1:
+            parameters.append(t_start + t)
 
-    if 0 < t1 and t1 < 1 and 0 < t2 and t2 < 1:
-        return [t1, t2]
+    if len(parameters) == 2:
+        return parameters
     else:
         return []
 
@@ -176,12 +184,9 @@ def curveIntersects(c1, c2, curveIntersectionThreshold):
                     # special-case line-line intersection as the divide-and-
                     # conquer algorithm fails to find intersections which fall
                     # exactly in the middle...
-                    result = lineIntersects(
-                        (c1[j].points[0], c1[j].points[-1]),
-                        (c2[k].points[0], c2[k].points[-1]))
+                    result = lineIntersects(c1[j], c2[k])
                     if result:
-                        i1, i2 = result
-                        intersections.append([c1[j]._t1 + i1, c2[k]._t1 + i2])
+                        intersections.append(result)
                 else:
                     pairs.append(_Pair(c1[j], c2[k]))
 
