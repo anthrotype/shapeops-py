@@ -8,7 +8,20 @@ import shapeops
 
 def main():
     data = json.load(sys.stdin)
-    result = shapeops.union(data)
+
+    if {'--profile'}.intersection(sys.argv):
+        import cProfile
+
+        ret = []
+        cProfile.runctx(
+            'ret.append(shapeops.union(data))',
+            globals={'shapeops': shapeops},
+            locals={'data': data, 'ret': ret},
+            sort="cumtime",
+            filename="shapeops.cprof")
+        result = ret[0]
+    else:
+        result = shapeops.union(data)
     print(json.dumps(result, indent=2, sort_keys=True))
 
 
